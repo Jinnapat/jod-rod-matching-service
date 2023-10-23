@@ -1,12 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { MongoClient, Collection, ObjectId } from 'mongodb';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class ParkingSpaceService {
   private parkingSpaceCollection: Collection;
 
+  constructor(private readonly configService: ConfigService) {}
+
   async initialize() {
-    const client = new MongoClient('mongodb://root:example@localhost:27017');
+    const client = new MongoClient(this.configService.get('MONGO_URL'));
     await client.connect();
     const db = client.db('match-service');
     this.parkingSpaceCollection = db.collection('parking-spaces');
