@@ -1,4 +1,10 @@
 services:
+  api:
+    build: .
+    ports:
+      - 3000:3000
+    environment:
+      MONGO_URL: mongodb://root:example@mongo:27017
   mongo:
     image: mongo
     restart: always
