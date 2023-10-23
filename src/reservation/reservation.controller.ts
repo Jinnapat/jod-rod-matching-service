@@ -3,7 +3,9 @@ import { ReservationService } from './reservation.service';
 
 @Controller('reservation')
 export class ReservationController {
-  constructor(private readonly reservationService: ReservationService) {}
+  constructor(private readonly reservationService: ReservationService) {
+    this.reservationService.initialize();
+  }
 
   @Post('reserve')
   async reserveHandler(@Body('userId') userId) {
