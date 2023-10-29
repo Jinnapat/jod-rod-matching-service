@@ -1,10 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { MongoClient, Collection, ObjectId } from 'mongodb';
+import { Injectable } from '@nestjs/common';
+import { MongoClient, Collection } from 'mongodb';
 import { ConfigService } from '@nestjs/config';
+import { Channel, connect } from 'amqplib';
 
 @Injectable()
 export class ReservationService {
-  private reservationCollection: Collection;
+  private confirmedReservationCollection: Collection;
+  private channel: Channel;
 
   constructor(private readonly configService: ConfigService) {}
 
@@ -12,23 +14,27 @@ export class ReservationService {
     const client = new MongoClient(this.configService.get('MONGO_URL'));
     await client.connect();
     const db = client.db('match-service');
-    this.reservationCollection = db.collection('reservations');
-    console.log('connected to reservation db');
-  }
-
-  async reserve(userId: number) {
-    this.reservationCollection.insertOne({
-      userId,
-      reservedTime: Date.now(),
-    });
-  }
-
-  async updateReservationStatus(reservationId: string, status: boolean) {
-    const updateResult = await this.reservationCollection.updateOne(
-      { _id: new ObjectId(reservationId) },
-      { $set: { approved: status } },
+    this.confirmedReservationCollection = db.collection(
+      'confirmedReservations',
     );
-    if (updateResult.matchedCount == 0)
-      throw new NotFoundException('No reservation with that id');
+    console.log('connected to reservation db');
+
+    const conn = await connect(this.configService.get('CLOUDAMQP_URL'));
+    this.channel = await conn.createChannel();
+  }
+
+  async reserve(userId: number, parkingLotId: string) {
+    const msg = JSON.stringify(userId);
+    await this.channel.assertQueue(parkingLotId, {
+      durable: false,
+    });
+    this.channel.sendToQueue(parkingLotId, Buffer.from(msg));
+  }
+
+  async confirm(userId: number, parkingLotId: string) {
+    await this.confirmedReservationCollection.insertOne({
+      userId,
+      parkingLotId,
+    });
   }
 }

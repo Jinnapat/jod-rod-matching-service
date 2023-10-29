@@ -1,24 +1,25 @@
-import { Controller, Post, Param, Body } from '@nestjs/common';
+import { Controller, Post, Body } from '@nestjs/common';
 import { ReservationService } from './reservation.service';
 
-@Controller('reservation')
+@Controller()
 export class ReservationController {
   constructor(private readonly reservationService: ReservationService) {
     this.reservationService.initialize();
   }
 
-  @Post('reserve')
-  async reserveHandler(@Body('userId') userId) {
-    return await this.reservationService.reserve(userId);
+  @Post('createReservation')
+  async createReservationsHandler(
+    @Body('userId') userId,
+    @Body('parkingLotId') parkingLotId,
+  ) {
+    return await this.reservationService.reserve(userId, parkingLotId);
   }
 
-  @Post('confirm/:id')
-  async confirmReservationHandler(@Param('id') id) {
-    return await this.reservationService.updateReservationStatus(id, true);
-  }
-
-  @Post('reject/:id')
-  async rejectReservationHandler(@Param('id') id) {
-    return await this.reservationService.updateReservationStatus(id, false);
+  @Post('confirmReservation')
+  async confirmReservationHandler(
+    @Body('userId') userId,
+    @Body('parkingLotId') parkingLotId,
+  ) {
+    return await this.reservationService.confirm(userId, parkingLotId);
   }
 }
