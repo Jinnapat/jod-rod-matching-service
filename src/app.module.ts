@@ -4,15 +4,10 @@ import { AppService } from './app.service';
 import { ReservationController } from './reservation/reservation.controller';
 import { ReservationService } from './reservation/reservation.service';
 import { ReservationModule } from './reservation/reservation.module';
-import { ParkingSpaceModule } from './parking-space/parking-space.module';
 import { ConfigModule } from '@nestjs/config';
 
 @Module({
-  imports: [
-    ReservationModule,
-    ParkingSpaceModule,
-    ConfigModule.forRoot({ isGlobal: true }),
-  ],
+  imports: [ReservationModule, ConfigModule.forRoot({ isGlobal: true })],
   controllers: [AppController, ReservationController],
   providers: [AppService, ReservationService],
 })
