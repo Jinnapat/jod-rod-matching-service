@@ -1,4 +1,8 @@
 FROM node:18-alpine
-COPY . .
+WORKDIR /usr/app
+COPY package.json .
+COPY package-lock.json .
 RUN npm install
-CMD npm run start
+COPY . .
+RUN npm run build
+CMD npm run start:prod
