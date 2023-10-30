@@ -19,7 +19,8 @@ export class ReservationService {
     );
     console.log('connected to reservation db');
 
-    const conn = await connect(this.configService.get('CLOUDAMQP_URL'));
+    const conn = await connect(this.configService.get('AMQP_URL'));
+    console.log('connected to rabbitmq');
     this.channel = await conn.createChannel();
   }
 

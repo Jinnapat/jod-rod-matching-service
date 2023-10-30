@@ -1,15 +1,16 @@
 services:
   rabbitmq:
-    image: rabbitmq:3-management-alpine
+    image: rabbitmq:3-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - matching-service-net
     healthcheck:
-        test: ["CMD", "curl", "-f", "http://127.0.0.1:5672"]
+        test: ["CMD", "curl", "-f", "http://localhost:15672"]
         interval: 30s
         timeout: 10s
         retries: 5
-    ports:
-      - "5672:5672"
-    networks:
-      - matching-service-net
   mongo:
     image: mongo
     restart: always
@@ -24,12 +25,13 @@ services:
       - 9000:3000
     environment:
       MONGO_URL: mongodb://root:example@mongo:27017
-      CLOUDAMQP_URL: amqp://rabbitmq:5672
+      AMQP_URL: 'amqp://rabbitmq?connection_attempts=5&retry_delay=5'
     networks:
       - matching-service-net
     depends_on:
       - rabbitmq
       - mongo
+    restart: on-failure
 networks:
   matching-service-net:
     driver: bridge
