@@ -1,12 +1,13 @@
 services:
   rabbitmq:
-    image: rabbitmq:3-alpine
+    image: rabbitmq:3-management-alpine
     ports:
       - "5672:5672"
+      - "15672:15672"
     networks:
       - matching-service-net
     healthcheck:
-        test: ["CMD", "curl", "-f", "http://localhost:15672"]
+        test: ["CMD", "curl", "-f", "http://localhost:5672"]
         interval: 30s
         timeout: 10s
         retries: 5
