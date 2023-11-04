@@ -50,7 +50,7 @@ export class ReservationService {
   }
 
   async reserve(userId: number, parkingLotId: string) {
-    // await this.checkAvailability(parkingLotId);
+    await this.checkAvailability(parkingLotId);
 
     const msg = JSON.stringify(userId);
     await this.channel.assertQueue(parkingLotId, {
