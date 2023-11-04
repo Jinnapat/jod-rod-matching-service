@@ -33,10 +33,7 @@ export class ReservationController {
   }
 
   @Post('confirmReservation/:id')
-  async confirmReservationHandler(
-    @Body('userId') userId,
-    @Body('parkingLotId') parkingLotId,
-  ) {
-    return await this.reservationService.confirm(userId, parkingLotId);
+  async confirmReservationHandler(@Param('id') reservationId) {
+    return await this.reservationService.confirm(reservationId);
   }
 }

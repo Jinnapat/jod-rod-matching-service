@@ -61,16 +61,23 @@ export class ReservationService {
     const insertResult = await this.reservationCollection.insertOne({
       userId,
       parkingLotId,
+      confirmed: false,
     });
 
     return insertResult.insertedId;
   }
 
-  async confirm(userId: number, parkingLotId: string) {
-    await this.reservationCollection.insertOne({
-      userId,
-      parkingLotId,
-    });
+  async confirm(reservationId: string) {
+    const updateResult = await this.reservationCollection.updateOne(
+      {
+        _id: new ObjectId(reservationId),
+      },
+      {
+        confirmed: true,
+      },
+    );
+    if (updateResult.matchedCount == 0)
+      throw new NotFoundException('No reservation with that id');
   }
 
   private async checkParkingLotExist(parkingLotId: string) {
@@ -102,6 +109,7 @@ export class ReservationService {
       id: reservation._id,
       userId: reservation.userId,
       parkingLotId: reservation.parkingLotId,
+      confirmed: reservation.confirmed,
     };
   }
 
