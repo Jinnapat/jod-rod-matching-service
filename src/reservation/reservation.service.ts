@@ -105,6 +105,17 @@ export class ReservationService {
     return findResult.length;
   }
 
+  async getAciveReservationsByUser(userIdString: string) {
+    const userId = parseInt(userIdString);
+
+    await this.checkUserExist(userId);
+
+    const findResult = await this.reservationCollection
+      .find({ userId, lateAt: { $gt: Date.now() }, confirmed: false })
+      .toArray();
+    return findResult.map((reservation) => this.renameIdField(reservation));
+  }
+
   private async checkUserExist(userId: number) {
     const findUserResult = await fetch(
       this.configService.get('USER_SERVICE_URL') + '/getUser/' + userId,
