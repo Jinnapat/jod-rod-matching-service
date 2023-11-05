@@ -49,7 +49,10 @@ export class ReservationService {
     return this.renameIdField(getOneResult);
   }
 
-  async reserve(userId: number, parkingLotId: string) {
+  async reserve(userIdString: string, parkingLotId: string) {
+    const userId = parseInt(userIdString);
+
+    await this.checkUserExist(userId);
     await this.checkAvailability(parkingLotId);
 
     const msg = JSON.stringify(userId);
@@ -62,6 +65,8 @@ export class ReservationService {
       userId,
       parkingLotId,
       confirmed: false,
+      late: false,
+      createAt: Date.now(),
     });
 
     return insertResult.insertedId;
@@ -73,11 +78,20 @@ export class ReservationService {
         _id: new ObjectId(reservationId),
       },
       {
-        confirmed: true,
+        $set: { confirmed: true },
       },
     );
     if (updateResult.matchedCount == 0)
       throw new NotFoundException('No reservation with that id');
+  }
+
+  private async checkUserExist(userId: number) {
+    const findUserResult = await fetch(
+      this.configService.get('USER_SERVICE_URL') + '/getUser/' + userId,
+    );
+
+    if (findUserResult.status != 200)
+      throw new NotFoundException('Cant get information about that user');
   }
 
   private async checkParkingLotExist(parkingLotId: string) {
@@ -99,8 +113,7 @@ export class ReservationService {
     const findParkingLotResult = await this.checkParkingLotExist(parkingLotId);
 
     const responseBody = await new Response(findParkingLotResult.body).json();
-    if (!responseBody.available) throw new InternalServerErrorException();
-    if ((responseBody.available = 0))
+    if (responseBody.available == 0)
       throw new ForbiddenException('the parking lot is full.');
   }
 
