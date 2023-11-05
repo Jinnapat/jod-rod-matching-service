@@ -36,4 +36,9 @@ export class ReservationController {
   async confirmReservationHandler(@Param('id') reservationId) {
     return await this.reservationService.confirm(reservationId);
   }
+
+  @Get('getActiveReservations/:id')
+  async getActiveReservationsHandler(@Param('id') parkingLotId) {
+    return await this.reservationService.countActiveReservations(parkingLotId);
+  }
 }

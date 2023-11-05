@@ -1,7 +1,6 @@
 import {
   ForbiddenException,
   Injectable,
-  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { MongoClient, Collection, ObjectId } from 'mongodb';
@@ -65,8 +64,10 @@ export class ReservationService {
       userId,
       parkingLotId,
       confirmed: false,
-      late: false,
-      createAt: Date.now(),
+      lateAt:
+        Date.now() +
+        parseInt(this.configService.get('RESERVAtion_DURATION_MS')),
+      left: false,
     });
 
     return insertResult.insertedId;
@@ -83,6 +84,25 @@ export class ReservationService {
     );
     if (updateResult.matchedCount == 0)
       throw new NotFoundException('No reservation with that id');
+  }
+
+  async countActiveReservations(parkingLotId: string) {
+    const findResult = await this.reservationCollection
+      .find({
+        parkingLotId: parkingLotId,
+        $or: [
+          {
+            lateAt: { $gt: Date.now() },
+            confirmed: false,
+          },
+          {
+            confirmed: true,
+            left: false,
+          },
+        ],
+      })
+      .toArray();
+    return findResult.length;
   }
 
   private async checkUserExist(userId: number) {
@@ -123,6 +143,8 @@ export class ReservationService {
       userId: reservation.userId,
       parkingLotId: reservation.parkingLotId,
       confirmed: reservation.confirmed,
+      lateAt: reservation.lateAt,
+      left: reservation.left,
     };
   }
 
