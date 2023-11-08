@@ -27,20 +27,27 @@ export class ReservationService {
   }
 
   async getReservations() {
-    const getAllResult = await this.reservationCollection.find().toArray();
-    return getAllResult.map((reservation) => this.renameIdField(reservation));
+    const getAllResult = await this.reservationCollection
+      .find({
+        lateAt: { $gt: Date.now() },
+        confirmed: false,
+        left: false,
+      })
+      .toArray();
+    return await this.addUsernameField(getAllResult);
   }
 
   async getReservationsByParkingLotId(parkingLotId: string) {
     await this.checkParkingLotExist(parkingLotId);
-    const getManyResult = await this.reservationCollection
+    const getAllResult = await this.reservationCollection
       .find({
-        parkingLotId,
+        parkingLotId: parkingLotId,
+        lateAt: { $gt: Date.now() },
+        confirmed: false,
+        left: false,
       })
       .toArray();
-    if (getManyResult.length == 0)
-      throw new NotFoundException('no reservation with that parking lot');
-    return getManyResult.map((reservation) => this.renameIdField(reservation));
+    return await this.addUsernameField(getAllResult);
   }
 
   async getReservationById(id: string) {
@@ -123,6 +130,7 @@ export class ReservationService {
 
     if (findUserResult.status != 200)
       throw new NotFoundException('Cant get information about that user');
+    return await new Response(findUserResult.body).json();
   }
 
   private async checkParkingLotExist(parkingLotId: string) {
@@ -146,6 +154,25 @@ export class ReservationService {
     const responseBody = await new Response(findParkingLotResult.body).json();
     if (responseBody.available == 0)
       throw new ForbiddenException('the parking lot is full.');
+  }
+
+  private async addUsernameField(reservations) {
+    return await Promise.all(
+      reservations.map(async (reservation) => {
+        const userInfo = await this.checkUserExist(
+          parseInt(reservation.userId),
+        );
+        return {
+          id: reservation._id,
+          userId: reservation.userId,
+          username: userInfo.username,
+          parkingLotId: reservation.parkingLotId,
+          confirmed: reservation.confirmed,
+          lateAt: reservation.lateAt,
+          left: reservation.left,
+        };
+      }),
+    );
   }
 
   private renameIdField(reservation) {
