@@ -31,7 +31,7 @@ services:
       MONGO_URL: mongodb://root:example@mongo:27017
       AMQP_URL: 'amqp://rabbitmq?connection_attempts=5&retry_delay=5'
       USER_SERVICE_URL: http://host.docker.internal:5346/user-service
-      PARKING_LOT_SERVICE_URL: http://host.docker.internal:4000
+      PARKING_LOT_SERVICE_URL: http://host.docker.internal:5346/parking-lots-service
       RESERVAtion_DURATION_MS: 1800000
     networks:
       - matching-service-net
