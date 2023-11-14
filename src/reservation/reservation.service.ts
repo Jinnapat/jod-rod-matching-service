@@ -6,10 +6,31 @@ import {
 import { MongoClient, Collection, ObjectId } from 'mongodb';
 import { ConfigService } from '@nestjs/config';
 import { Channel, connect } from 'amqplib';
+import { SchedulerRegistry } from '@nestjs/schedule';
 
 interface Reservation {
   _id: string;
   userId: number;
+  parkingLotId: string;
+  confirmed: boolean;
+  lateAt: number;
+  left: boolean;
+}
+
+export interface ReservationWithParkingSpaceInfo {
+  id: string;
+  userId: number;
+  parkingLotId: string;
+  parkingLotName: string;
+  confirmed: boolean;
+  lateAt: number;
+  left: boolean;
+}
+
+export interface ReservationWithUserInfo {
+  id: string;
+  userId: number;
+  username: string;
   parkingLotId: string;
   confirmed: boolean;
   lateAt: number;
@@ -30,7 +51,10 @@ export class ReservationService {
   private reservationCollection: Collection;
   private channel: Channel;
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    private schedulerRegistry: SchedulerRegistry,
+  ) {}
 
   async initialize() {
     const client = new MongoClient(this.configService.get('MONGO_URL'));
@@ -77,11 +101,12 @@ export class ReservationService {
     const userId = parseInt(userIdString);
 
     await this.checkUserExist(userId);
+    const getParkingLotResult = await this.checkParkingLotExist(parkingLotId);
     await this.checkAvailability(parkingLotId);
 
     await this.addMessageToQueue(parkingLotId, userId);
 
-    const insertResult = await this.reservationCollection.insertOne({
+    const document = {
       userId,
       parkingLotId,
       confirmed: false,
@@ -89,9 +114,16 @@ export class ReservationService {
         Date.now() +
         parseInt(this.configService.get('RESERVATION_DURATION_MS')),
       left: false,
-    });
+    };
 
-    return insertResult.insertedId;
+    const insertResult = await this.reservationCollection.insertOne(document);
+
+    this.addTimer({
+      ...document,
+      parkingLotName: getParkingLotResult.name,
+      id: insertResult.insertedId.toString(),
+    });
+    return insertResult.insertedId.toString();
   }
 
   async confirm(reservationId: string) {
@@ -186,7 +218,9 @@ export class ReservationService {
       throw new ForbiddenException('the parking lot is full.');
   }
 
-  private async addUsernameField(reservations: Reservation[]) {
+  private async addUsernameField(
+    reservations: Reservation[],
+  ): Promise<ReservationWithUserInfo[]> {
     return await Promise.all(
       reservations.map(async (reservation) => {
         const userInfo = await this.checkUserExist(reservation.userId);
@@ -203,7 +237,9 @@ export class ReservationService {
     );
   }
 
-  private async addParkingSpaceFields(reservation: Reservation) {
+  private async addParkingSpaceFields(
+    reservation: Reservation,
+  ): Promise<ReservationWithParkingSpaceInfo> {
     const getParkingLotResult = await this.checkParkingLotExist(
       reservation.parkingLotId,
     );
@@ -233,5 +269,20 @@ export class ReservationService {
       durable: false,
     });
     this.channel.sendToQueue(queueName, Buffer.from(msg));
+  }
+
+  private addTimer(reservation: ReservationWithParkingSpaceInfo) {
+    const callback = async () => {
+      const msg = {
+        ...reservation,
+        status: 'LATED',
+      };
+      await this.addMessageToQueue(JSON.stringify(reservation.userId), msg);
+    };
+    const timeout = setTimeout(
+      callback,
+      parseInt(this.configService.get('RESERVATION_DURATION_MS')),
+    );
+    this.schedulerRegistry.addTimeout(reservation.id, timeout);
   }
 }
