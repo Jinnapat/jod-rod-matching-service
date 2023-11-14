@@ -44,6 +44,6 @@ export class ReservationController {
 
   @Get('getActiveReservationsByUser/:id')
   async getActiveReservationsByUserHandler(@Param('id') userId) {
-    return await this.reservationService.getAciveReservationsByUser(userId);
+    return await this.reservationService.getActiveReservationsByUser(userId);
   }
 }

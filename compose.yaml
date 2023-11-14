@@ -32,7 +32,7 @@ services:
       AMQP_URL: 'amqp://rabbitmq?connection_attempts=5&retry_delay=5'
       USER_SERVICE_URL: http://host.docker.internal:5346/user-service
       PARKING_LOT_SERVICE_URL: http://host.docker.internal:5346/parking-lots-service
-      RESERVAtion_DURATION_MS: 1800000
+      RESERVATION_DURATION_MS: 1800000
     networks:
       - matching-service-net
     depends_on:

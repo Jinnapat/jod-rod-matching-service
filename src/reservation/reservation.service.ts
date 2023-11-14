@@ -61,11 +61,7 @@ export class ReservationService {
     await this.checkUserExist(userId);
     await this.checkAvailability(parkingLotId);
 
-    const msg = JSON.stringify(userId);
-    await this.channel.assertQueue(parkingLotId, {
-      durable: false,
-    });
-    this.channel.sendToQueue(parkingLotId, Buffer.from(msg));
+    await this.addMessageToQueue(parkingLotId, userId);
 
     const insertResult = await this.reservationCollection.insertOne({
       userId,
@@ -73,7 +69,7 @@ export class ReservationService {
       confirmed: false,
       lateAt:
         Date.now() +
-        parseInt(this.configService.get('RESERVAtion_DURATION_MS')),
+        parseInt(this.configService.get('RESERVATION_DURATION_MS')),
       left: false,
     });
 
@@ -91,6 +87,15 @@ export class ReservationService {
     );
     if (updateResult.matchedCount == 0)
       throw new NotFoundException('No reservation with that id');
+    const getReservationResult = await this.getReservationById(reservationId);
+    const msg = {
+      ...getReservationResult,
+      status: 'CONFIRMED',
+    };
+    await this.addMessageToQueue(
+      JSON.stringify(getReservationResult.userId),
+      msg,
+    );
   }
 
   async countActiveReservations(parkingLotId: string) {
@@ -112,7 +117,7 @@ export class ReservationService {
     return findResult.length;
   }
 
-  async getAciveReservationsByUser(userIdString: string) {
+  async getActiveReservationsByUser(userIdString: string) {
     const userId = parseInt(userIdString);
 
     await this.checkUserExist(userId);
@@ -193,5 +198,13 @@ export class ReservationService {
     if (!getOneResult)
       throw new NotFoundException('no reservation with that id');
     return getOneResult;
+  }
+
+  private async addMessageToQueue(queueName: string, message: any) {
+    const msg = JSON.stringify(message);
+    await this.channel.assertQueue(queueName, {
+      durable: false,
+    });
+    this.channel.sendToQueue(queueName, Buffer.from(msg));
   }
 }
