@@ -1,6 +1,7 @@
 import {
   ForbiddenException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { MongoClient, Collection, ObjectId } from 'mongodb';
@@ -44,6 +45,12 @@ interface ParkingLot {
   name: string;
   totalParking: number;
   available: number;
+}
+
+interface PenaltyStatus {
+  status: 'NORMAL' | 'PENALTY';
+  unBannedDate: number;
+  leftQuota: number;
 }
 
 @Injectable()
@@ -273,12 +280,36 @@ export class ReservationService {
 
   private addTimer(reservation: ReservationWithParkingSpaceInfo) {
     const callback = async () => {
+      const addLateCountResponse = await fetch(
+        this.configService.get('USER_SERVICE_URL') +
+          '/addLateCount/' +
+          reservation.userId,
+        {
+          method: 'POST',
+        },
+      );
+      if (addLateCountResponse.status != 200)
+        throw new InternalServerErrorException();
+
+      const getPenaltyResponse = await fetch(
+        this.configService.get('USER_SERVICE_URL') +
+          '/getPenaltyStatus/' +
+          reservation.userId,
+      );
+      if (getPenaltyResponse.status != 200)
+        throw new InternalServerErrorException();
+      const penaltyStatus: PenaltyStatus = await new Response(
+        getPenaltyResponse.body,
+      ).json();
       const msg = {
         ...reservation,
-        status: 'LATED',
+        status: penaltyStatus.status == 'PENALTY' ? 'BANNED' : 'LATED',
+        unBannedDate: penaltyStatus.unBannedDate,
+        leftQuota: penaltyStatus.leftQuota,
       };
       await this.addMessageToQueue(JSON.stringify(reservation.userId), msg);
     };
+
     const timeout = setTimeout(
       callback,
       parseInt(this.configService.get('RESERVATION_DURATION_MS')),
