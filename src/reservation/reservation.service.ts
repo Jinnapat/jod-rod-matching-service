@@ -7,6 +7,24 @@ import { MongoClient, Collection, ObjectId } from 'mongodb';
 import { ConfigService } from '@nestjs/config';
 import { Channel, connect } from 'amqplib';
 
+interface Reservation {
+  _id: string;
+  userId: number;
+  parkingLotId: string;
+  confirmed: boolean;
+  lateAt: number;
+  left: boolean;
+}
+
+interface ParkingLot {
+  id: string;
+  lat: number;
+  lng: number;
+  name: string;
+  totalParking: number;
+  available: number;
+}
+
 @Injectable()
 export class ReservationService {
   private reservationCollection: Collection;
@@ -28,7 +46,7 @@ export class ReservationService {
 
   async getReservations() {
     const getAllResult = await this.reservationCollection
-      .find({
+      .find<Reservation>({
         lateAt: { $gt: Date.now() },
         confirmed: false,
         left: false,
@@ -40,7 +58,7 @@ export class ReservationService {
   async getReservationsByParkingLotId(parkingLotId: string) {
     await this.checkParkingLotExist(parkingLotId);
     const getAllResult = await this.reservationCollection
-      .find({
+      .find<Reservation>({
         parkingLotId: parkingLotId,
         lateAt: { $gt: Date.now() },
         confirmed: false,
@@ -52,7 +70,7 @@ export class ReservationService {
 
   async getReservationById(id: string) {
     const getOneResult = await this.getAtLeastOne(id);
-    return this.renameIdField(getOneResult);
+    return this.addParkingSpaceFields(getOneResult);
   }
 
   async reserve(userIdString: string, parkingLotId: string) {
@@ -123,9 +141,15 @@ export class ReservationService {
     await this.checkUserExist(userId);
 
     const findResult = await this.reservationCollection
-      .find({ userId, lateAt: { $gt: Date.now() }, confirmed: false })
+      .find<Reservation>({
+        userId,
+        lateAt: { $gt: Date.now() },
+        confirmed: false,
+      })
       .toArray();
-    return findResult.map((reservation) => this.renameIdField(reservation));
+    return findResult.map((reservation) =>
+      this.addParkingSpaceFields(reservation),
+    );
   }
 
   private async checkUserExist(userId: number) {
@@ -138,7 +162,9 @@ export class ReservationService {
     return await new Response(findUserResult.body).json();
   }
 
-  private async checkParkingLotExist(parkingLotId: string) {
+  private async checkParkingLotExist(
+    parkingLotId: string,
+  ): Promise<ParkingLot> {
     const findParkingLotResult = await fetch(
       this.configService.get('PARKING_LOT_SERVICE_URL') +
         '/getParkingSpace/' +
@@ -150,23 +176,20 @@ export class ReservationService {
         'Cant get information about that parking lot',
       );
 
-    return findParkingLotResult;
+    return await new Response(findParkingLotResult.body).json();
   }
 
   private async checkAvailability(parkingLotId: string) {
     const findParkingLotResult = await this.checkParkingLotExist(parkingLotId);
 
-    const responseBody = await new Response(findParkingLotResult.body).json();
-    if (responseBody.available == 0)
+    if (findParkingLotResult.available == 0)
       throw new ForbiddenException('the parking lot is full.');
   }
 
-  private async addUsernameField(reservations) {
+  private async addUsernameField(reservations: Reservation[]) {
     return await Promise.all(
       reservations.map(async (reservation) => {
-        const userInfo = await this.checkUserExist(
-          parseInt(reservation.userId),
-        );
+        const userInfo = await this.checkUserExist(reservation.userId);
         return {
           id: reservation._id,
           userId: reservation.userId,
@@ -180,11 +203,15 @@ export class ReservationService {
     );
   }
 
-  private renameIdField(reservation) {
+  private async addParkingSpaceFields(reservation: Reservation) {
+    const getParkingLotResult = await this.checkParkingLotExist(
+      reservation.parkingLotId,
+    );
     return {
       id: reservation._id,
       userId: reservation.userId,
       parkingLotId: reservation.parkingLotId,
+      parkingLotName: getParkingLotResult.name,
       confirmed: reservation.confirmed,
       lateAt: reservation.lateAt,
       left: reservation.left,
@@ -192,7 +219,7 @@ export class ReservationService {
   }
 
   private async getAtLeastOne(id: string) {
-    const getOneResult = await this.reservationCollection.findOne({
+    const getOneResult = await this.reservationCollection.findOne<Reservation>({
       _id: new ObjectId(id),
     });
     if (!getOneResult)
