@@ -53,6 +53,12 @@ interface PenaltyStatus {
   leftQuota: number;
 }
 
+interface UserProfile {
+  id: number;
+  username: string;
+  email: string;
+}
+
 @Injectable()
 export class ReservationService {
   private reservationCollection: Collection;
@@ -189,6 +195,25 @@ export class ReservationService {
     return findResult.map((reservation) =>
       this.addParkingSpaceFields(reservation),
     );
+  }
+
+  async checkIsParkingLotReviewable(parkingLotId: string, bearerToken: string) {
+    const getUserInfoResponse = await fetch(
+      this.configService.get('USER_SERVICE_URL') + '/getProfile',
+      { headers: { Authorization: bearerToken } },
+    );
+    if (getUserInfoResponse.status != 200)
+      throw new NotFoundException('Cant get information about that user');
+    const userProfile: UserProfile = await new Response(
+      getUserInfoResponse.body,
+    ).json();
+    const findReservationsResult = await this.reservationCollection
+      .find({
+        userId: userProfile.id,
+        parkingLotId: parkingLotId,
+      })
+      .toArray();
+    return findReservationsResult.length > 0;
   }
 
   private async checkUserExist(userId: number) {

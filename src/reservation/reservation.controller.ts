@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Param } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, Headers } from '@nestjs/common';
 import { ReservationService } from './reservation.service';
 
 @Controller()
@@ -45,5 +45,16 @@ export class ReservationController {
   @Get('getActiveReservationsByUser/:id')
   async getActiveReservationsByUserHandler(@Param('id') userId) {
     return await this.reservationService.getActiveReservationsByUser(userId);
+  }
+
+  @Get('checkIsParkingLotReviewable/:id')
+  async checkIsParkingLotReviewableHandler(
+    @Param('id') parkingLotId,
+    @Headers('Authorization') bearerToken,
+  ) {
+    return await this.reservationService.checkIsParkingLotReviewable(
+      parkingLotId,
+      bearerToken,
+    );
   }
 }
